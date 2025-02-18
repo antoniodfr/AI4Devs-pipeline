@@ -83,6 +83,7 @@ jobs:
             # Clone the repository fresh
             git clone https://${{ secrets.GIT_TOKEN }}@github.com/antoniodfr/AI4Devs-pipeline.git backend
             cd backend
+            ls -la
             
             # Install dependencies and build
             npm ci
