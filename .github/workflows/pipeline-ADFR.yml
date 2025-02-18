@@ -1,0 +1,96 @@
+name: Backend CI/CD Pipeline 
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  test-build-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run Tests
+        working-directory: ./backend
+        run: npm test
+
+      - name: Build Backend
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_INSTANCE }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Install nvm if not present
+            if [ ! -d "$HOME/.nvm" ]; then
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            fi
+            
+            # Load nvm
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Install Node.js 16 if not present
+            if ! command -v node &> /dev/null; then
+              nvm install 16
+              nvm use 16
+            fi
+            
+            # Install git if not present
+            if ! command -v git &> /dev/null; then
+              sudo yum update -y
+              sudo yum install git -y
+            fi
+            
+            # Install PM2 globally if not present
+            if ! command -v pm2 &> /dev/null; then
+              npm install -g pm2
+            fi
+            
+            # Create app directory if it doesn't exist
+            mkdir -p /home/ec2-user/app
+            cd /home/ec2-user/app
+            
+            # Remove existing backend directory if it exists
+            rm -rf lti
+            
+            # Clone the repository fresh
+            git clone https://${{ secrets.GIT_TOKEN }}@github.com/antoniodfr/AI4Devs-pipeline.git lti
+            cd lti/backend
+            
+            # Install dependencies and build
+            npm ci
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+            npm run build
+            
+            # Stop any existing PM2 process
+            pm2 delete backend || true
+            
+            # Start a new PM2 process
+            pm2 start dist/index.js --name backend
