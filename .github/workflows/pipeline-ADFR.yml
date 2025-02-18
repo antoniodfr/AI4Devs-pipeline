@@ -81,7 +81,7 @@ jobs:
             rm -rf backend
             
             # Clone the repository fresh
-            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/antoniodfr/AI4Devs-pipeline.git backend
+            git clone https://${{ secrets.GIT_TOKEN }}@github.com/antoniodfr/AI4Devs-pipeline.git backend
             cd backend
             
             # Install dependencies and build
