@@ -74,16 +74,17 @@ jobs:
             fi
             
             # Create app directory if it doesn't exist
-            mkdir -p /home/ec2-user/app/backend
-            cd /home/ec2-user/app/backend
+            mkdir -p /home/ec2-user/app
+            cd /home/ec2-user/app
             
-            # Initialize git repo if not already done
-            if [ ! -d .git ]; then
-              git init
-              git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-            fi
+            # Remove existing backend directory if it exists
+            rm -rf backend
             
-            git pull
+            # Clone the repository fresh
+            git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/YOUR_USERNAME/YOUR_REPO.git backend
+            cd backend
+            
+            # Install dependencies and build
             npm ci
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
             npm run build
@@ -92,5 +93,4 @@ jobs:
             pm2 delete backend || true
             
             # Start a new PM2 process
-            cd /home/ec2-user/app/backend
             pm2 start dist/index.js --name backend
