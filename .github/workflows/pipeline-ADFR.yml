@@ -87,4 +87,10 @@ jobs:
             npm ci
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
             npm run build
-            pm2 restart backend || pm2 start dist/index.js --name backend
+            
+            # Stop any existing PM2 process
+            pm2 delete backend || true
+            
+            # Start a new PM2 process
+            cd /home/ec2-user/app/backend
+            pm2 start dist/index.js --name backend
